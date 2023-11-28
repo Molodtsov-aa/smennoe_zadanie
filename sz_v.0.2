@@ -1,0 +1,503 @@
+import tkinter as tk
+from tkcalendar import DateEntry
+from tkinter import ttk
+from openpyxl import load_workbook
+import os
+from jinja2 import Template
+import pdfkit
+import subprocess
+from datetime import date
+import babel.numbers
+import sys
+import time
+import base64
+
+image_path = 'image_zid.png'
+
+with open(image_path, "rb") as img_file:
+    encoded_image = base64.b64encode(img_file.read()).decode('utf-8')
+print(encoded_image)
+
+# Определение пути к wkhtmltopdf.exe в зависимости от режима выполнения
+if getattr(sys, 'frozen', False):
+    # Если скрипт выполняется в standalone режиме (exe-файл)
+    wkhtmltopdf_path = os.path.join(sys._MEIPASS, 'wkhtmltopdf.exe')
+else:
+    # Если скрипт выполняется в режиме разработки (исходный код)
+    wkhtmltopdf_path = 'C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe'  # Замените на ваш путь
+
+# Установите конфигурацию для pdfkit с указанием пути к wkhtmltopdf
+config = pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
+
+# Создаем список для хранения всех созданных Entry виджетов с деталями
+detail_entries = []
+all_operations = []  # Создаем пустой список для операций
+current_details_list = []
+all_details = []
+
+
+# Шаг 1: Определите начальную позицию для новых текстовых полей
+# Эта переменная должна быть выше всех функций в вашем скрипте
+current_row = 12  # Начальная строка для текстовых полей с деталями
+print_button = None
+
+
+# Создаем список для хранения всех деталей
+all_details = []
+detail_entries = []
+normi_vars = []
+detail_vars = []
+operation_vars = []
+norma_vars = []
+norma_detal_vars = []
+
+def clear_detail_entries():
+    global current_row  # Используем глобальную переменную
+    for entry, var in detail_entries:
+        entry.grid_forget()  # Удаляем виджет с формы
+        var.set('')  # Очищаем связанную с Entry переменную
+    detail_entries.clear()  # Очищаем список созданных Entry виджетов
+    current_row = 12  # Сбрасываем значение current_row к начальному
+
+
+def display_details():
+    info_var.set('')  # Очищаем поле перед обновлением
+    for detail in all_details:
+        # Формируем строку для каждой детали
+        details_info = f"{detail['Изделие']} {detail['Деталь']} {detail['Операция']} {detail['Норма на 1шт']}шт. {detail['Норма деталей']}дет.\n"
+        # Добавляем строку в текстовое поле
+        info_var.set(info_var.get() + details_info)
+
+
+def add_detail():
+    global current_row, print_button, all_operations  # Объявляем использование глобальной переменной для отслеживания текущей строки
+    # Сохраняем текущие значения в словарь current_detail
+    current_detail = {
+        "Изделие": normi_var.get(),
+        "Деталь": detail_var.get(),
+        "Операция": operation_var.get(),
+        "Норма на 1шт": norma_var.get(),
+        "Норма деталей": norma_detal_var.get()
+    }
+
+    current_operations = [operation_var.get()]  # Создаем список для текущей детали
+    print("Current Operations:", current_operations)  # Добавленная строка
+    all_operations.append({"operations": current_operations})
+    # Вывод отладочной информации
+    print("Adding detail:")
+    print(current_detail)
+    print("All details after adding:")
+    print(all_details)
+
+    # Добавляем словарь в список всех деталей
+    all_details.append(current_detail)
+
+    # Формируем строку для отображения информации о детали
+    details_info = f"{current_detail['Изделие']} {current_detail['Деталь']} {current_detail['Операция']} {current_detail['Норма на 1шт']}шт. {current_detail['Норма деталей']}дет."
+
+    # Создаем Entry виджет и добавляем его в интерфейс
+    detail_info_var = tk.StringVar(root)
+    detail_info_var.set(details_info)  # Устанавливаем информацию в переменную
+    detail_entry = ttk.Entry(root, textvariable=detail_info_var, state="readonly", width=50)
+    detail_entry.grid(row=current_row, column=0, columnspan=2, padx=10, pady=2)  # Устанавливаем виджет в новую строку
+    detail_entries.append((detail_entry, detail_info_var))  # Сохраняем ссылку на виджет и связанную с ним переменную
+
+    # Добавляем переменные в соответствующие списки
+    normi_vars.append(normi_var.get())
+    detail_vars.append(detail_var.get())
+    operation_vars.append(operation_var.get())
+    norma_vars.append(norma_var.get())
+    norma_detal_vars.append(norma_detal_var.get())
+
+    # Увеличиваем счётчик строки для следующего добавления
+    current_row += 1
+
+    print_button.grid(row=current_row, column=0, columnspan=2, pady=(0, 10))
+
+    # Очищаем поля ввода
+    normi_combobox.set('')
+    detail_combobox.set('')
+    operation_combobox.set('')
+    norma_var.set('')
+    norma_detal_var.set('')
+
+    root.update()
+
+
+def clear_all_fields():
+    # Обнуляем переменные
+    date_entry.set_date(date.today())  # установим текущую дату
+    uchastok_var.set('')
+    master_var.set('')
+    employee_var.set('')
+    position_var.set('')
+    normi_var.set('')
+    detail_var.set('')
+    operation_var.set('')
+    norma_var.set('')
+    norma_detal_var.set('')
+
+    # Обновляем значения Combobox
+    master_combobox.set('')
+    employee_combobox.set('')
+    normi_combobox.set('')
+    detail_combobox['values'] = []  # очищаем список
+    detail_combobox.set('')
+    operation_combobox['values'] = []  # очищаем список
+    operation_combobox.set('')
+
+    # Обновляем графический интерфейс, если это необходимо
+    root.update_idletasks()
+
+
+def generate_pdf_report():
+    generate_html_report()  # Эта функция должна быть вызвана первой для создания HTML файла
+    pdfkit.from_file('output_report.html', 'output_report.pdf', options={'encoding': "UTF-8"})
+
+
+
+# Функция для конвертации HTML в PDF и открытия PDF
+def convert_html_to_pdf():
+    generate_html_report(all_details)  # Создаём HTML
+    print(f"Converting HTML to PDF. Date value: {date_entry.get_date().strftime('%d.%m.%Y')}")
+
+
+    pdfkit.from_file('output_report.html', 'output_report.pdf', configuration=config, options={'encoding': "UTF-8", 'images': None})  # Конвертируем в PDF в PDF
+    subprocess.Popen(['output_report.pdf'], shell=True)  # Открываем PDF файл
+
+
+def generate_html_report(details_list):
+    date_value = date_entry.get_date().strftime('%d.%m.%Y')
+    master = master_var.get()
+    employee = employee_var.get()
+
+    # Вывод отладочной информации
+    print(f"date_value: {date_value}")
+    print(f"master: {master}")
+    print(f"employee: {employee}")
+
+    with open("shab.j2", "r", encoding="utf-8") as file:
+        template_content = file.read()
+
+    template = Template(template_content)
+    details = details_list if details_list else [
+        {"Изделие": "", "Деталь": "", "Операция": "", "Норма_на_1шт": "", "Норма_деталей": ""}]
+    print("Details before rendering template:")
+    print(details_list)
+
+    current_detail = {
+        "Изделие": normi_var.get(),
+        "Деталь": detail_var.get(),
+        "Операция": operation_var.get(),
+        "Норма на 1шт": norma_var.get(),
+        "Норма деталей": norma_detal_var.get()
+    }
+
+    # Добавляем изделие в текущий словарь
+    current_detail["Изделие"] = normi_var.get()
+    rendered_template = template.render(
+        date_value=date_value,
+        master=master_var.get(),
+        uchastok=uchastok_var.get(),
+        employee_var=employee_var,
+        employee=employee,
+        norma_vars=norma_vars,
+        detail_vars=detail_vars,
+        operation_vars=operation_vars,
+        normi_vars=normi_vars,
+        norma_detal_vars=norma_detal_vars,
+        position=position_var.get(),
+        normi=normi_var.get(),
+        detail=all_details,
+        detail1=all_details[0] if all_details else {"Изделие": "", "Деталь": "", "Операция": "", "Норма на 1шт": "",
+                                                    "Норма деталей": ""},
+        detail2=all_details[1] if len(all_details) > 1 else {"Изделие": "", "Деталь": "", "Операция": "",
+                                                             "Норма на 1шт": "",
+                                                             "Норма деталей": ""},
+        details=details,
+        zip=zip,  # передаем функцию zip в шаблон
+        all_operations=all_operations
+    )
+
+    # Вывод отладочной информации
+    with open("output_report.html", "w", encoding="utf-8") as file:
+        file.write(rendered_template)
+    print("HTML report generated successfully")
+
+def load_selected_table(selected_normi):
+    selected_table = load_workbook(f'normi/{selected_normi}.xlsx').active
+    return selected_table
+
+
+def update_norma_detal_value(*args):
+    norma_value = norma_var.get()
+    if norma_value:
+        norma_detal = int(480 / float(norma_value))
+        norma_detal_var.set(norma_detal)
+    else:
+        norma_detal_var.set('')
+
+
+def update_norma_value(*args):
+    selected_normi = normi_var.get()
+    selected_detail = detail_var.get()
+    selected_operation = operation_var.get()
+    selected_detail = selected_detail.strip()
+    selected_operation = selected_operation.strip()
+
+    if selected_normi and selected_detail and selected_operation:
+        selected_table = load_selected_table(selected_normi)
+        operation_number = selected_operation.split(' - ')[0]  # Получаем номер операции из комбинированной строки
+
+        for row in selected_table.iter_rows(values_only=True):
+            if row[0] and row[2] and str(row[0]).strip() == selected_detail and str(row[2]).strip() == operation_number:
+                norma_var.set(row[11])  # Устанавливаем значение нормы времени на 1 шт
+                norma_value = row[11]
+                if norma_value:
+                    rounded_norma_value = round(norma_value, 2)  # Округляем до двух знаков после запятой
+                    norma_var.set(rounded_norma_value)
+                    norma_detal = int(480 / float(norma_value))
+                    norma_detal_var.set(norma_detal)  # Рассчитываем и устанавливаем значение нормы деталей на смену
+                    return
+    norma_var.set('')
+    norma_detal_var.set('')
+
+
+
+def update_detail_list(*args):
+    filter_text = detail_var.get().lower()
+    selected_normi = normi_var.get()
+    if selected_normi:
+        selected_table = load_selected_table(selected_normi)
+        detail_values = set(row[0] for row in selected_table.iter_rows(values_only=True) if
+                            row[0] and filter_text.lower() in str(row[0]).lower())
+        detail_combobox['values'] = sorted(detail_values)
+
+
+def update_lists(*args):
+    filter_text = detail_var.get().lower()
+    selected_normi = normi_var.get()
+    if selected_normi:
+        selected_table = load_selected_table(selected_normi)
+        detail_values = set(row[0] for row in selected_table.iter_rows(values_only=True) if
+                            row[0] and filter_text.lower() in str(row[0]).lower())
+        detail_combobox['values'] = sorted(detail_values)
+
+        operation_values = set(row[2] for row in selected_table.iter_rows(values_only=True) if row[2])
+        operation_combobox['values'] = sorted(operation_values, key=lambda x: str(x))
+
+
+def print_information():
+    generate_pdf_report()
+
+
+def update_employee_list(*args):
+    filter_text = employee_var.get().lower()
+    filtered_list = [item for item in employee_list if filter_text.lower() in str(item).lower()]
+    employee_combobox['values'] = filtered_list
+
+
+def update_position(*args):
+    selected_employee = employee_var.get()
+    for row in sheet.iter_rows(values_only=True):
+        if row[2] == selected_employee:
+            position_var.set(row[3])
+            break
+
+
+def update_normi_list(*args):
+    filter_text = normi_var.get().lower()
+    filtered_list = [item for item in normi_files if filter_text.lower() in str(item).lower()]
+    normi_combobox['values'] = filtered_list
+
+
+def update_detail_list(*args):
+    filter_text = detail_var.get().lower()
+    selected_normi = normi_var.get()
+    if selected_normi:
+        selected_table = load_selected_table(selected_normi)
+        detail_values = set(row[0] for row in selected_table.iter_rows(values_only=True) if
+                            row[0] and filter_text.lower() in str(row[0]).lower())
+        detail_combobox['values'] = sorted(detail_values)
+
+
+
+def update_operation_list(*args):
+    selected_normi = normi_var.get()
+    selected_detail = detail_var.get()
+    if selected_normi and selected_detail:
+        selected_table = load_selected_table(selected_normi)
+        operations = []
+        for row in selected_table.iter_rows(values_only=True):
+            if row[0] == selected_detail and row[2]:
+                operation_number = row[2]
+                operation_name = row[5]
+                formatted_operation = f"{operation_number} - {operation_name}"  # Форматируем номер и название операции
+                operations.append(formatted_operation)
+        operation_combobox['values'] = sorted(operations)
+    else:
+        operation_combobox.set('')
+
+    update_norma_value()
+
+
+def clear_detail_list(*args):
+    if not operation_var.get():
+        detail_combobox.set('')
+
+
+def clear_operation_list(*args):
+    operation_combobox.set('')
+
+def add_detail_if_empty():
+    global all_details  # Добавленная строка
+    if not all_details:  # Если список пуст
+        add_detail()
+
+
+
+def convert_html_to_pdf_and_clear():
+    global all_details
+    add_detail_if_empty()
+    # Вывод отладочной информации
+    print("Details before generating PDF:")
+    print(all_details)
+
+    current_details_list = all_details.copy()  # Копируем данные в глобальную переменную
+
+    generate_html_report(all_details)  # Передаем актуальный список деталей
+  # Передаем актуальный список деталей
+    convert_html_to_pdf()  # Генерация и открытие PDF
+    clear_all_fields()  # Очистка полей после печати
+    clear_detail_entries()
+
+    all_details = []  # Очистка списка all_details
+
+
+# Получаем текущий рабочий каталог
+current_directory = os.getcwd()
+
+# Формируем относительный путь к файлу
+relative_path = 'sotrudniki.xlsx'
+file_path = os.path.join(current_directory, relative_path)
+
+# Загружаем книгу
+workbook = load_workbook(file_path)
+
+sheet = workbook.active
+employee_list = [row[2] for row in sheet.iter_rows(values_only=True)][1:]
+
+normi_files = [os.path.splitext(file)[0] for file in os.listdir(os.path.join(os.getcwd(), 'normi'))]
+
+
+root = tk.Tk()
+root.title("Сменное задание")
+root.geometry("450x570")
+
+# Получаем текущий рабочий каталог
+current_directory = os.getcwd()
+
+# Формируем относительный путь к иконке
+icon_path = os.path.join(current_directory, "logo.ico")
+
+# Устанавливаем иконку
+root.iconbitmap(icon_path)
+
+tk.Label(root, text="   Дата:").grid(row=0, column=0, sticky="w")
+
+date_entry = DateEntry(root, locale='ru_RU', date_pattern="dd.mm.yyyy")
+date_entry.grid(row=0, column=1, padx=10, pady=10)
+
+tk.Label(root, text="   Участок:").grid(row=1, column=0, sticky="w")
+
+uchastok_var = tk.StringVar()
+
+uchastok1_radio = ttk.Radiobutton(root, text="1 участок", variable=uchastok_var, value="1 участок")
+uchastok1_radio.grid(row=1, column=1, sticky="w")
+
+uchastok2_radio = ttk.Radiobutton(root, text="2 участок", variable=uchastok_var, value="2 участок")
+uchastok2_radio.grid(row=1, column=1, sticky="e")
+
+tk.Label(root, text="   Мастер:").grid(row=2, column=0, sticky="w")
+master_var = tk.StringVar()
+master_combobox = ttk.Combobox(root, textvariable=master_var)
+master_combobox['values'] = [
+    "Гаврилов Сергей Викторович",
+    "Красин Станислав Сергеевич",
+    "Лёзов Алексей Александрович",
+    "Бородин Кирилл Олегович",
+    "Веселов Алексей Валерьевич"
+]
+master_combobox.grid(row=2, column=1, padx=10, pady=10)
+
+tk.Label(root, text="   Сотрудник:").grid(row=3, column=0, sticky="w")
+
+employee_var = tk.StringVar()
+employee_var.trace("w", update_employee_list)
+employee_combobox = ttk.Combobox(root, textvariable=employee_var)
+employee_combobox['values'] = [str(item) for item in employee_list]
+employee_combobox.grid(row=3, column=1, padx=10, pady=10)
+employee_combobox.bind("<<ComboboxSelected>>", update_position)
+
+tk.Label(root, text="   Должность:").grid(row=4, column=0, sticky="w")
+position_var = tk.StringVar()
+position_entry = ttk.Entry(root, textvariable=position_var, state="readonly", width=27)
+position_entry.grid(row=4, column=1, padx=10, pady=10)
+
+tk.Label(root, text="   Изделие:").grid(row=5, column=0, sticky="w")
+normi_var = tk.StringVar()
+normi_var.trace("w", update_normi_list)
+normi_combobox = ttk.Combobox(root, textvariable=normi_var)
+normi_combobox['values'] = normi_files
+normi_combobox.grid(row=5, column=1, padx=10, pady=10)
+normi_combobox.bind("<<ComboboxSelected>>", [update_detail_list, update_operation_list])
+
+tk.Label(root, text="   Деталь:").grid(row=6, column=0, sticky="w")
+detail_var = tk.StringVar()
+detail_combobox = ttk.Combobox(root, textvariable=detail_var, width=27)
+detail_combobox.grid(row=6, column=1, padx=10, pady=10)
+detail_combobox.bind("<<ComboboxSelected>>", update_operation_list)
+detail_var.trace("w", update_detail_list)
+
+tk.Label(root, text="   Операция:").grid(row=7, column=0, sticky="w")
+operation_var = tk.StringVar()
+operation_combobox = ttk.Combobox(root, textvariable=operation_var, width=27)
+operation_combobox.grid(row=7, column=1, padx=10, pady=10)
+operation_combobox.bind("<<ComboboxSelected>>", clear_detail_list)
+operation_combobox.config(width=40)  # Установка ширины выпадающего списка на 40 символов
+
+
+tk.Label(root, text="   Норма времени на 1 шт.:").grid(row=8, column=0, sticky="w")
+norma_var = tk.StringVar()
+norma_entry = ttk.Entry(root, textvariable=norma_var, state="readonly", width=27)
+norma_entry.grid(row=8, column=1, padx=10, pady=10)
+
+tk.Label(root, text="   Норма деталей на смену:").grid(row=9, column=0, sticky="w")
+norma_detal_var = tk.StringVar()
+norma_detal_entry = ttk.Entry(root, textvariable=norma_detal_var, state="readonly", width=27)
+norma_detal_entry.grid(row=9, column=1, padx=10, pady=10)
+
+# info_var = tk.StringVar()
+# info_entry = ttk.Entry(root, textvariable=info_var, state="readonly", width=50)
+# info_entry.grid(row=11, column=0, columnspan=2, padx=10, pady=10)
+
+
+detail_combobox.bind("<<ComboboxSelected>>", update_norma_value)
+operation_combobox.bind("<<ComboboxSelected>>", update_norma_value)
+
+print_button = tk.Button(root, text="Печать", command=convert_html_to_pdf_and_clear)
+print_button.grid(row=current_row, column=0, columnspan=2, pady=(0, 10))
+
+# Кнопка "Добавить деталь" остается неизменной
+add_detail_button = tk.Button(root, text="Добавить деталь", command=add_detail)
+add_detail_button.grid(row=10, column=0, columnspan=2, pady=(20, 10))
+
+normi_combobox.bind("<<ComboboxSelected>>", update_lists)
+
+detail_combobox.bind("<<ComboboxSelected>>", update_operation_list)
+operation_combobox.bind("<<ComboboxSelected>>", update_norma_value)
+
+operation_combobox.bind("<<ComboboxSelected>>", update_norma_value)
+norma_var.trace("w", update_norma_detal_value)
+
+root.mainloop()
